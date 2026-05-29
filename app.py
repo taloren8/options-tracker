@@ -7,6 +7,37 @@ import anthropic
 
 st.set_page_config(page_title="Options Tracker", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
+# ── Login System ─────────────────────────────────────────────────────────────
+USERS = {"tal": "1234", "omer": "4321"}
+
+def show_login():
+    st.markdown("""
+    <div style='max-width:400px;margin:80px auto;padding:2rem;background:#1e2130;border-radius:16px;border:1px solid #2d3247;'>
+    <h2 style='color:white;text-align:center;margin-bottom:1.5rem;'>📊 Options Tracker</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown("### 👤 התחברות")
+        username = st.text_input("שם משתמש", placeholder="tal / omer").lower().strip()
+        password = st.text_input("סיסמה", type="password")
+        if st.button("🔐 כניסה", type="primary"):
+            if username in USERS and USERS[username] == password:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.rerun()
+            else:
+                st.error("שם משתמש או סיסמה שגויים")
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+if not st.session_state.logged_in:
+    show_login()
+    st.stop()
+
 # ── Dark / Light Mode ────────────────────────────────────────────────────────
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = True
@@ -73,7 +104,7 @@ def get_or_create_sheet(client):
         ws = sh.add_worksheet("Trades", 1000, 20)
         ws.append_row(["ID","Date","Ticker","Type","Strike","Expiry","Contracts","Premium",
                         "Stop Loss","TP1","TP2","Catalyst","Trade Type","Max Days",
-                        "Exit Price","Exit Date","Status","P&L $","P&L %","Notes"])
+                        "Exit Price","Exit Date","Status","P&L $","P&L %","Notes","User"])
     return sh, ws
 
 def load_trades(ws):
@@ -83,7 +114,7 @@ def load_trades(ws):
 def save_trade(ws, t):
     ws.append_row([t["id"],t["date"],t["ticker"],t["type"],t["strike"],t["expiry"],
                    t["contracts"],t["premium"],t["stop_loss"],t["tp1"],t["tp2"],
-                   t["catalyst"],t["trade_type"],t.get("max_days",""),"","","פתוח","","",""])
+                   t["catalyst"],t["trade_type"],t.get("max_days",""),"","","פתוח","","","",t.get("user","")])
 
 def update_trade_exit(ws, trade_id, exit_price, exit_date, status, pnl_d, pnl_p, notes=""):
     data = ws.get_all_values()
@@ -173,11 +204,17 @@ def dashboard_summary(df_open, df_closed):
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 📊 Options Tracker")
+    st.markdown(f"👤 **{st.session_state.username}**")
     
     # Dark/Light toggle
     mode_label = "☀️ מצב בהיר" if st.session_state.dark_mode else "🌙 מצב כהה"
     if st.button(mode_label):
         st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
+    
+    if st.button("🚪 התנתק"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
         st.rerun()
     
     st.markdown("---")
@@ -192,8 +229,15 @@ client = get_gsheet_client()
 if not client: st.stop()
 sh, ws = get_or_create_sheet(client)
 df_all = load_trades(ws)
-df_open   = df_all[df_all["Status"]=="פתוח"].copy()   if not df_all.empty else pd.DataFrame()
-df_closed = df_all[df_all["Status"].isin(["רווח","הפסד","פג תוקף"])].copy() if not df_all.empty else pd.DataFrame()
+current_user = st.session_state.username
+if not df_all.empty:
+    if "User" in df_all.columns:
+        df_all = df_all[df_all["User"] == current_user]
+    df_open   = df_all[df_all["Status"]=="פתוח"].copy()
+    df_closed = df_all[df_all["Status"].isin(["רווח","הפסד","פג תוקף"])].copy()
+else:
+    df_open = pd.DataFrame()
+    df_closed = pd.DataFrame()
 
 # ══ DASHBOARD ══════════════════════════════════════════════════════════════════
 if page == "🏠 דשבורד":
@@ -295,7 +339,8 @@ elif page == "➕ טרייד חדש":
                 save_trade(ws,{"id":int(datetime.now().timestamp()),"date":date.today().strftime("%Y-%m-%d"),
                     "ticker":ticker,"type":otype,"strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),
                     "contracts":contracts,"premium":premium,"stop_loss":sl,"tp1":tp1,"tp2":tp2,
-                    "catalyst":catalyst,"trade_type":ttype,"max_days":max_days if ttype=="מולטי-יום" else ""})
+                    "catalyst":catalyst,"trade_type":ttype,"max_days":max_days if ttype=="מולטי-יום" else "",
+                    "user":st.session_state.username})
                 st.success(f"✅ נשמר! SL:${sl} | TP1:${tp1} | TP2:${tp2}")
                 st.info("💡 לך ל-'🔍 נתח טרייד' לניתוח AI מלא.")
                 st.cache_resource.clear()
