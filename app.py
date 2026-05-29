@@ -31,7 +31,7 @@ div[data-testid="stExpander"]{border:1px solid #2d3247;border-radius:8px;backgro
 """, unsafe_allow_html=True)
 
 # ── Google Sheets ──────────────────────────────────────────────────────────────
-SHEET_NAME = "Options Tracker"
+SHEET_ID = "1z7XztQvxVowKH64RWdGMgQ5aRbhSY9ueh4AnnCX7HTI"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 
 @st.cache_resource
@@ -43,10 +43,7 @@ def get_gsheet_client():
         st.error(f"שגיאת חיבור: {e}"); return None
 
 def get_or_create_sheet(client):
-    try: sh = client.open(SHEET_NAME)
-    except gspread.SpreadsheetNotFound:
-        sh = client.create(SHEET_NAME)
-        sh.share(None, perm_type='anyone', role='writer')
+    sh = client.open_by_key(SHEET_ID)
     try: ws = sh.worksheet("Trades")
     except gspread.WorksheetNotFound:
         ws = sh.add_worksheet("Trades", 1000, 20)
