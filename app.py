@@ -100,7 +100,7 @@ def days_to_expiry(expiry_str):
     except: return None
 
 # ── AI Analysis ────────────────────────────────────────────────────────────────
-def analyze_trade(ticker, option_type, strike, expiry, premium, contracts, catalyst):
+def analyze_trade(ticker, option_type, strike, expiry, premium, contracts, catalyst, current_price=0):
     try:
         api_key = st.secrets.get("ANTHROPIC_API_KEY","")
         if not api_key:
@@ -109,10 +109,15 @@ def analyze_trade(ticker, option_type, strike, expiry, premium, contracts, catal
         dte = days_to_expiry(expiry)
         sl, tp1, tp2, total = calc_levels(premium, contracts)
         breakeven = strike + premium/100 if option_type=="Call" else strike - premium/100
+        price_line = f"מחיר נוכחי של המניה: ${current_price}" if current_price and current_price > 0 else "מחיר נוכחי: לא סופק — חפש בעצמך"
+        otm_pct = round((strike - current_price) / current_price * 100, 1) if current_price > 0 and option_type=="Call" else round((current_price - strike) / current_price * 100, 1) if current_price > 0 else 0
+        otm_line = f"המניה צריכה לזוז {otm_pct}% כדי להגיע לסטרייק" if current_price > 0 else ""
 
         prompt = f"""אתה אנליסט options מקצועי. נתח את הטרייד הבא בעברית — ישיר, קצר, מבוסס עובדות.
 
 טרייד: {ticker} {option_type} ${strike} | פקיעה {expiry} ({dte} ימים) | פרמיה ${premium} x{contracts}
+{price_line}
+{otm_line}
 SL: ${sl} | TP1: ${tp1} | TP2: ${tp2} | נקודת איזון: ~${breakeven:.2f}
 קטליסט שצוין: {catalyst or 'לא צוין'}
 
@@ -312,6 +317,7 @@ elif page == "🔍 נתח טרייד":
         c1,c2,c3,c4 = st.columns(4)
         c1.metric("טיקר",ticker); c2.metric("סטרייק",f"${strike}")
         c3.metric("פקיעה",expiry); c4.metric("ימים",days_to_expiry(expiry) or "?")
+        current_price = st.number_input("מחיר נוכחי של המניה ($) — חובה לדיוק", min_value=0.0, step=0.5, key="cp_existing")
     else:
         c1,c2,c3 = st.columns(3)
         with c1: ticker    = st.text_input("טיקר",placeholder="NVDA").upper().strip()
@@ -322,6 +328,7 @@ elif page == "🔍 נתח טרייד":
         with c5: contracts = st.number_input("חוזים",min_value=1,max_value=10,value=1)
         with c6: premium   = st.number_input("פרמיה ($)",min_value=0.0,step=5.0)
         catalyst = st.text_input("קטליסט (אופציונלי)")
+        current_price = st.number_input("מחיר נוכחי של המניה ($) — חובה לדיוק", min_value=0.0, step=0.5, help="הכנס את המחיר הנוכחי מ-Google Finance / Yahoo Finance")
 
     st.markdown("---")
     if st.button("🔍 נתח עכשיו", type="primary"):
@@ -329,7 +336,7 @@ elif page == "🔍 נתח טרייד":
             st.error("מלא טיקר, סטרייק ופרמיה")
         else:
             with st.spinner(f"מחפש מידע על {ticker} ומנתח..."):
-                analysis, err = analyze_trade(ticker,otype,strike,expiry,premium,contracts,catalyst)
+                analysis, err = analyze_trade(ticker,otype,strike,expiry,premium,contracts,catalyst,current_price)
             if err:
                 st.error(f"שגיאה: {err}")
                 if "ANTHROPIC_API_KEY" in err:
