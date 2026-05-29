@@ -5,28 +5,52 @@ import pandas as pd
 from datetime import datetime, date
 import anthropic
 
-st.set_page_config(page_title="Options Tracker", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Options Tracker", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-st.markdown("""
+# ── Dark / Light Mode ────────────────────────────────────────────────────────
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = True
+dm = st.session_state.dark_mode
+
+bg_main      = "#0e1117" if dm else "#f8fafc"
+bg_card      = "#1e2130" if dm else "#ffffff"
+bg_card2     = "#151929" if dm else "#f1f5f9"
+border       = "#2d3247" if dm else "#e2e8f0"
+txt_main     = "#ffffff"  if dm else "#0f172a"
+txt_sec      = "#8b8fa8"  if dm else "#64748b"
+txt_body     = "#e2e8f0"  if dm else "#334155"
+analysis_bg  = "#1a1f35"  if dm else "#eff6ff"
+claude_bg    = "#1a1f35"  if dm else "#eff6ff"
+expander_bg  = "#1e2130"  if dm else "#ffffff"
+
+st.markdown(f"""
 <style>
-.main{background-color:#0e1117}
-.metric-card{background:#1e2130;border-radius:12px;padding:1.2rem 1.5rem;border:1px solid #2d3247;margin-bottom:.5rem}
-.metric-label{color:#8b8fa8;font-size:13px;margin-bottom:4px}
-.metric-value{color:#fff;font-size:26px;font-weight:600}
-.metric-sub{font-size:13px;margin-top:2px}
-.green{color:#22c55e}.red{color:#ef4444}.yellow{color:#f59e0b}
-.stButton>button{background:#3b82f6;color:white;border:none;border-radius:8px;padding:.5rem 1.5rem;font-weight:500;width:100%}
-.stButton>button:hover{background:#2563eb}
-.warning-box{background:#422006;border:1px solid #92400e;border-radius:8px;padding:.75rem 1rem;color:#fcd34d;font-size:14px;margin-bottom:1rem}
-.info-box{background:#1e3a5f;border:1px solid #1d4ed8;border-radius:8px;padding:.75rem 1rem;color:#93c5fd;font-size:14px;margin-bottom:1rem}
-.analysis-box{background:#1a1f35;border:1px solid #3b82f6;border-radius:12px;padding:1.25rem 1.5rem;margin-top:1rem;font-size:14px;color:#e2e8f0;line-height:1.7}
-.analysis-title{color:#60a5fa;font-weight:600;margin-bottom:.75rem;font-size:15px}
-.verdict-go{background:#14532d;border:1px solid #16a34a;border-radius:8px;padding:.75rem 1rem;color:#86efac;font-weight:600;font-size:15px;margin-bottom:.75rem}
-.verdict-nogo{background:#450a0a;border:1px solid #dc2626;border-radius:8px;padding:.75rem 1rem;color:#fca5a5;font-weight:600;font-size:15px;margin-bottom:.75rem}
-.verdict-caution{background:#422006;border:1px solid #d97706;border-radius:8px;padding:.75rem 1rem;color:#fcd34d;font-weight:600;font-size:15px;margin-bottom:.75rem}
-.claude-box{background:#1a1f35;border:1px solid #3b82f6;border-radius:10px;padding:1rem 1.2rem;margin-top:1rem;font-size:14px;color:#e2e8f0;line-height:1.6}
-.claude-title{color:#60a5fa;font-weight:600;margin-bottom:.5rem;font-size:13px;text-transform:uppercase;letter-spacing:.05em}
-div[data-testid="stExpander"]{border:1px solid #2d3247;border-radius:8px;background:#1e2130}
+.main,.stApp{{background-color:{bg_main}!important}}
+section[data-testid="stSidebar"]{{background-color:{bg_card}!important;border-right:1px solid {border}}}
+@media(max-width:768px){{
+  .main .block-container{{padding:0.5rem 0.75rem!important}}
+  h2{{font-size:1.3rem!important}}
+  .metric-value{{font-size:20px!important}}
+}}
+.metric-card{{background:{bg_card};border-radius:12px;padding:1rem 1.25rem;border:1px solid {border};margin-bottom:.5rem}}
+.metric-label{{color:{txt_sec};font-size:13px;margin-bottom:4px}}
+.metric-value{{color:{txt_main};font-size:26px;font-weight:600}}
+.metric-sub{{font-size:13px;margin-top:2px;color:{txt_sec}}}
+.green{{color:#22c55e}}.red{{color:#ef4444}}.yellow{{color:#f59e0b}}
+.stButton>button{{background:#3b82f6;color:white;border:none;border-radius:8px;padding:.5rem 1.5rem;font-weight:500;width:100%;font-size:15px}}
+.stButton>button:hover{{background:#2563eb}}
+.warning-box{{background:#422006;border:1px solid #92400e;border-radius:8px;padding:.75rem 1rem;color:#fcd34d;font-size:14px;margin-bottom:1rem}}
+.info-box{{background:#1e3a5f;border:1px solid #1d4ed8;border-radius:8px;padding:.75rem 1rem;color:#93c5fd;font-size:14px;margin-bottom:1rem}}
+.analysis-box{{background:{analysis_bg};border:1px solid #3b82f6;border-radius:12px;padding:1.25rem 1.5rem;margin-top:1rem;font-size:14px;color:{txt_body};line-height:1.7}}
+.analysis-title{{color:#60a5fa;font-weight:600;margin-bottom:.75rem;font-size:15px}}
+.verdict-go{{background:#14532d;border:1px solid #16a34a;border-radius:8px;padding:.75rem 1rem;color:#86efac;font-weight:600;font-size:15px;margin-bottom:.75rem}}
+.verdict-nogo{{background:#450a0a;border:1px solid #dc2626;border-radius:8px;padding:.75rem 1rem;color:#fca5a5;font-weight:600;font-size:15px;margin-bottom:.75rem}}
+.verdict-caution{{background:#422006;border:1px solid #d97706;border-radius:8px;padding:.75rem 1rem;color:#fcd34d;font-weight:600;font-size:15px;margin-bottom:.75rem}}
+.claude-box{{background:{claude_bg};border:1px solid #3b82f6;border-radius:10px;padding:1rem 1.2rem;margin-top:1rem;font-size:14px;color:{txt_body};line-height:1.6}}
+.claude-title{{color:#60a5fa;font-weight:600;margin-bottom:.5rem;font-size:13px;text-transform:uppercase;letter-spacing:.05em}}
+div[data-testid="stExpander"]{{border:1px solid {border}!important;border-radius:8px!important;background:{expander_bg}!important}}
+label,.stRadio label,p,.stMarkdown{{color:{txt_body}!important}}
+h1,h2,h3{{color:{txt_main}!important}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -144,6 +168,13 @@ def dashboard_summary(df_open, df_closed):
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 📊 Options Tracker")
+    
+    # Dark/Light toggle
+    mode_label = "☀️ מצב בהיר" if st.session_state.dark_mode else "🌙 מצב כהה"
+    if st.button(mode_label):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
+    
     st.markdown("---")
     page = st.radio("ניווט", ["🏠 דשבורד","➕ טרייד חדש","🔍 נתח טרייד",
                                "📋 פוזיציות פתוחות","✅ סגור טרייד","📈 היסטוריה","📋 העתק לקלוד"],
